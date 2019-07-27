@@ -4,64 +4,62 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/fabianolaudutra/goToken/app/model"
-	"github.com/gorilla/mux"
-	"github.com/jinzhu/gorm"
+	
 )
 
-func GetAllTokens(db *gorm.DB, response http.ResponseWriter, request *http.Request) {
+func GetAllTokens(db *gorm.DB, resp http.ResponseWriter, req *http.Request) {
 	tokens := []model.Tokens{}
 	db.Find(&tokens)
-	responseJSON(response, http.StatusOK, tokens)
+	responseJSON(resp, http.StatusOK, tokens)
 }
 
-func CreateTokens(db *gorm.DB, response http.ResponseWriter, request *http.Request) {
+func CreateTokens(db *gorm.DB, resp http.ResponseWriter, req *http.Request) {
 	tokens := model.Tokens{}
 
-	parse := json.NewDecoder(request.Body)
+	parse := json.NewDecoder(req.Body)
 	if err := parse.Decode(&tokens); err != nil {
-		responseError(response, http.StatusBadRequest, err.Error())
+		responseError(resp, http.StatusBadRequest, err.Error())
 		return
 	}
-	defer request.Body.Close()
+	defer req.Body.Close()
 
 	if err := db.Save(&tokens).Error; err != nil {
-		responseError(request, http.StatusInternalServerError, err.Error())
+		responseError(resp, http.StatusInternalServerError, err.Error())
 		return
 	}
-	responseJSON(response, http.StatusCreated, tokens)
+	responseJSON(resp, http.StatusCreated, tokens)
 }
 
-func GetToken(db *gorm.DB, response http.ResponseWriter, request *http.Request) {
-	vars := mux.Vars(request)
+func GetToken(db *gorm.DB, resp http.ResponseWriter, req *http.Request) {
+	vars := mux.Vars(req)
 
 	hash := vars["hash"]
-	hash := getTokenOr404(db, hash, response, request)
+	tokens := getTokenOr404(db, hash, resp, req)
 	if tokens == nil {
 		return
 	}
-	responseJSON(response, http.StatusOK, token)
+	responseJSON(resp, http.StatusOK, tokens)
 }
 
-func DeleteToken(db *gorm.DB, response http.ResponseWriter, request *http.Request) {
-	vars := mux.Vars(request)
+func DeleteToken(db *gorm.DB, resp http.ResponseWriter, req *http.Request) {
+	vars := mux.Vars(req)
 
 	hash := vars["hash"]
-	hash := getTokenOr404(db, hash, response, request)
-	if hash == nil {
+	hashes := getTokenOr404(db, hash, resp, req)
+	if hashes == nil {
 		return
 	}
 	if err := db.Delete(&hash).Error; err != nil {
-		respondError(response, http.StatusInternalServerError, err.Error())
+		responseError(resp, http.StatusInternalServerError, err.Error())
 		return
 	}
-	respondJSON(response, http.StatusNoContent, nil)
+	responseJSON(resp, http.StatusNoContent, nil)
 }
 
-func getTokenOr404(db *gorm.DB, hash string, response http.ResponseWriter, request *http.Request) *model.Tokens {
+func getTokenOr404(db *gorm.DB, hash string, resp http.ResponseWriter, req *http.Request) *model.Tokens {
 	token := model.Tokens{}
 	if err := db.First(&token, model.Tokens{Hash: hash}).Error; err != nil {
-		respondError(response, http.StatusNotFound, err.Error())
+		responseError(resp, http.StatusNotFound, err.Error())
 		return nil
 	}
 	return &token

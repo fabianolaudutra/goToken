@@ -5,18 +5,18 @@ import (
 	"net/http"
 )
 
-func responseJSON(w http.ResponseWriter, status int, payload interface{}) {
+func responseJSON(res http.ResponseWriter, status int, payload interface{}) {
 	response, err := json.Marshal(payload)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
+		res.WriteHeader(http.StatusInternalServerError)
+		res.Write([]byte(err.Error()))
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	w.Write([]byte(response))
+	res.Header().Set("Content-Type", "application/json")
+	res.WriteHeader(status)
+	res.Write([]byte(response))
 }
 
-func responseError(w http.ResponseWriter, code int, message string) {
-	responseJSON(w, code, map[string]string{"error": message})
+func responseError(res http.ResponseWriter, code int, message string) {
+	responseJSON(res, code, map[string]string{"error": message})
 }
