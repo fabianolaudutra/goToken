@@ -27,27 +27,11 @@ type responseToken struct {
 
 
 func GetAllTokens(db *gorm.DB, resp http.ResponseWriter, req *http.Request) {
-	projects := []model.Tokens{}
-	db.Find(&projects)
-	responseJSON(resp, http.StatusOK, projects)
-	/*
-	tokenEtn := []model.Tokens{}
-	
-	db.Find(&tokenEtn)
-	
-	output, err := json.Marshal(&tokenEtn)
-	if err != nil {
-		http.Error(resp, err.Error(), 500)
-		return
-	}
-	resp.Header().Set("content-type", "application/json")
-	resp.WriteHeader(http.StatusOK)
-	resp.Write(output)
-	*/
+	tks := []model.Tokens{}
+	db.Find(&tks)
+		
+	responseJSON(resp, http.StatusOK, tks)
 }
-
-
-
 
 func CreateTokens(db *gorm.DB, resp http.ResponseWriter, req *http.Request) {
 	tokens_ := responseToken{}
@@ -119,6 +103,7 @@ func DeleteToken(db *gorm.DB, resp http.ResponseWriter, req *http.Request) {
 	}
 	responseJSON(resp, http.StatusNoContent, nil)
 }
+
 
 
 func getTokenOr404(db *gorm.DB, hash string, resp http.ResponseWriter, req *http.Request) *model.Tokens {
