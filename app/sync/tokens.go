@@ -3,38 +3,102 @@ package sync
 import (
 	"encoding/json"
 	"net/http"
-
+	"github.com/fabianolaudutra/goToken/app/model"
+	"github.com/jinzhu/gorm"
+	"github.com/gorilla/mux"
+	"io/ioutil"
+	"time"
+	"golang.org/x/crypto/sha3"
+	"encoding/hex"
 	
 )
 
-func GetAllTokens(db *gorm.DB, resp http.ResponseWriter, req *http.Request) {
-	tokens := []model.Tokens{}
-	db.Find(&tokens)
-	responseJSON(resp, http.StatusOK, tokens)
+type retToken struct {
+	Token string `json:"token"`
+	Hashe string `json:"hashe"`
+	Created_at time.Time `json:"created_at"`
 }
 
-func CreateTokens(db *gorm.DB, resp http.ResponseWriter, req *http.Request) {
-	tokens := model.Tokens{}
+type responseToken struct {
+	
+	Hashe string `json:"hashe"`
+	Created_at time.Time `json:"created_at"`
+}
 
-	parse := json.NewDecoder(req.Body)
-	if err := parse.Decode(&tokens); err != nil {
-		responseError(resp, http.StatusBadRequest, err.Error())
+
+func GetAllTokens(db *gorm.DB, resp http.ResponseWriter, req *http.Request) {
+	projects := []model.Tokens{}
+	db.Find(&projects)
+	responseJSON(resp, http.StatusOK, projects)
+	/*
+	tokenEtn := []model.Tokens{}
+	
+	db.Find(&tokenEtn)
+	
+	output, err := json.Marshal(&tokenEtn)
+	if err != nil {
+		http.Error(resp, err.Error(), 500)
 		return
 	}
-	defer req.Body.Close()
+	resp.Header().Set("content-type", "application/json")
+	resp.WriteHeader(http.StatusOK)
+	resp.Write(output)
+	*/
+}
 
-	if err := db.Save(&tokens).Error; err != nil {
+
+
+
+func CreateTokens(db *gorm.DB, resp http.ResponseWriter, req *http.Request) {
+	tokens_ := responseToken{}
+	b, err := ioutil.ReadAll(req.Body)
+	defer req.Body.Close()
+	if err != nil {
+		http.Error(resp, err.Error(), 500)
+		return
+	}
+	
+	var ret retToken
+	err = json.Unmarshal(b, &ret)
+	if err != nil {
+		http.Error(resp, err.Error(), 500)
+		return
+	}	
+	
+	aStringToHash := []byte( ret.Token)
+	token := sha3.Sum256(aStringToHash)
+	tk := model.Tokens{Hash:string(hex.EncodeToString(token[:])),Token:ret.Token}
+	
+	tokens_.Hashe= string(hex.EncodeToString(token[:]))
+	tokens_.Created_at = time.Now()
+	
+	output, err := json.Marshal(tokens_)
+	if err != nil {
+		http.Error(resp, err.Error(), 500)
+		return
+	}
+	tokensValidade := getTokenOr404(db, string(hex.EncodeToString(token[:])), resp, req)
+	if tokensValidade != nil {
+		responseError(resp, http.StatusInternalServerError,"Duplicate Hash")
+		return
+	}
+
+	resp.Header().Set("content-type", "application/json")
+	if err := db.Save(&tk).Error; err != nil {
 		responseError(resp, http.StatusInternalServerError, err.Error())
 		return
 	}
-	responseJSON(resp, http.StatusCreated, tokens)
+	resp.WriteHeader(http.StatusOK)
+	resp.Write(output)
+	
 }
 
 func GetToken(db *gorm.DB, resp http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 
-	hash := vars["hash"]
-	tokens := getTokenOr404(db, hash, resp, req)
+	token := vars["token"]
+
+	tokens := getTokenOr404(db, token, resp, req)
 	if tokens == nil {
 		return
 	}
@@ -44,23 +108,26 @@ func GetToken(db *gorm.DB, resp http.ResponseWriter, req *http.Request) {
 func DeleteToken(db *gorm.DB, resp http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 
-	hash := vars["hash"]
-	hashes := getTokenOr404(db, hash, resp, req)
+	token := vars["token"]
+	hashes := getTokenOr404(db, token, resp, req)
 	if hashes == nil {
 		return
 	}
-	if err := db.Delete(&hash).Error; err != nil {
+	if err := db.Delete(&token).Error; err != nil {
 		responseError(resp, http.StatusInternalServerError, err.Error())
 		return
 	}
 	responseJSON(resp, http.StatusNoContent, nil)
 }
 
+
 func getTokenOr404(db *gorm.DB, hash string, resp http.ResponseWriter, req *http.Request) *model.Tokens {
 	token := model.Tokens{}
 	if err := db.First(&token, model.Tokens{Hash: hash}).Error; err != nil {
-		responseError(resp, http.StatusNotFound, err.Error())
+		
 		return nil
 	}
 	return &token
 }
+
+
